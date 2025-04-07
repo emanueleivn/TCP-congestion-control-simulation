@@ -16,7 +16,7 @@ function congestione_TCP
     xlabel(mainAx,'Tempo (Pacchetti trasmessi)','FontWeight','bold');
     ylabel(mainAx,'CongWind','FontWeight','bold');
     grid(mainAx,'on');
-
+    
     % Etichette
     rtt_label = uicontrol('Parent', fig, ...
         'Style','text','String','RTT: 0.20 s',...
@@ -84,7 +84,6 @@ function congestione_TCP
     end
 
     function triggerLoss(~, ~)
-        % Imposta il flag; la simulazione lo rileverà e forzerà 3 duplicate ACK
         lossTriggered = true;
         disp('[!] Bottone Loss premuto: simulazione di 3 duplicate ACK.');
     end
@@ -98,11 +97,11 @@ function congestione_TCP
     function runSimulation()
         % Parametri TCP iniziali
         CongWind = 1;         % Congestion Window iniziale
-        threshold = 16;        % Soglia iniziale
-        time = 1;             % Contatore di pacchetti (asse X)
+        treshold = 16;        % Soglia iniziale sstresh
+        time = 1;             
         CongWind_history = CongWind;
         
-        % Parametri per il buffer
+        % Impostazione del buffer
         bufferCapacity = 50;
         
         % Parametri per il RTT
@@ -121,7 +120,7 @@ function congestione_TCP
             old_time = time;
             old_CongWind = CongWind;
             
-            % Genera un RTT casuale (baseRTT + fluttuazione)
+            % Genera un RTT casuale (baseRTT + variazione)
             currentRTT = baseRTT + 0.3 * rand;
             set(rtt_label, 'String', ['RTT: ' num2str(currentRTT, '%.2f') ' s']);
             
@@ -132,9 +131,9 @@ function congestione_TCP
                 disp('[!] Loss triggered: forzo 3 duplicate ACK');
                 fast_recovery = true;
                 fr_iterations = FR_MAX_ITERS;
-                threshold = max(floor(CongWind / 2), 1);
-                CongWind = threshold + 3;  % ingresso in FR
-                dupACKCount = 0;          % reset del contatore
+                treshold = max(floor(CongWind / 2), 1);
+                CongWind = treshold + 3;
+                dupACKCount = 0;          
                 set(ack_label, 'String', 'ACK: dup (Loss triggered)');
                 set(dup_ack_label, 'String', 'Dup ACK: 3');
                 lossTriggered = false;
@@ -145,9 +144,9 @@ function congestione_TCP
                 % In Fast Recovery, aumenta la probabilità di duplicati
                 %--------------------------------------------------------------
                 if fast_recovery
-                    p_new = 0.3;  % 30% di probabilità di nuovo ACK in FR
+                    p_new = 0.3;  % 30% di probabilità di nuovo ACK-fast recovery
                 else
-                    p_new = 0.9;  % 90% di probabilità di nuovo ACK in condizioni normali
+                    p_new = 0.9;  % 90% di probabilità di nuovo ACK 
                 end
                 if rand < p_new
                     ackType = 'new';
@@ -164,9 +163,9 @@ function congestione_TCP
                     set(dup_ack_label, 'String', 'Dup ACK: 0');
                     if fast_recovery
                         fast_recovery = false;
-                        CongWind = threshold;  % uscita da Fast Recovery
+                        CongWind = treshold;  % uscita da Fast Recovery
                     else
-                        if CongWind < threshold
+                        if CongWind < treshold
                             % Slow Start: crescita esponenziale
                             CongWind = CongWind * 2;
                         else
@@ -174,19 +173,18 @@ function congestione_TCP
                             CongWind = CongWind + 1;
                         end
                     end
-                else  % ackType è 'dup'
+                else 
                     if ~fast_recovery
                         dupACKCount = dupACKCount + 1;
                         set(dup_ack_label, 'String', ['Dup ACK: ' num2str(dupACKCount)]);
                         if dupACKCount >= 3
                             fast_recovery = true;
                             fr_iterations = FR_MAX_ITERS;
-                            threshold = max(floor(CongWind / 2), 1);
-                            CongWind = threshold + 3;
+                            treshold = max(floor(CongWind / 2), 1);
+                            CongWind = treshold + 3;
                             dupACKCount = 0;
                         end
                     else
-                        % In Fast Recovery, ogni dup ACK incrementa la finestra
                         CongWind = CongWind + 1;
                     end
                 end
@@ -197,7 +195,7 @@ function congestione_TCP
             %--------------------------------------------------------------
             if timeoutTriggered
                 disp('[!] Timeout triggered: riportiamo a Slow Start');
-                threshold = max(floor(CongWind / 2), 1);
+                treshold = max(floor(CongWind / 2), 1);
                 CongWind = 1; % Ripartiamo da Slow Start
                 timeoutTriggered = false;
                 fast_recovery = false;
@@ -220,30 +218,30 @@ function congestione_TCP
             %--------------------------------------------------------------
             if ~fast_recovery && (CongWind > bufferCapacity)
                 disp('[!] Buffer overflow => Attivazione Fast Recovery');
-                threshold = max(floor(CongWind / 2), 1);
-                CongWind = threshold;
+                treshold = max(floor(CongWind / 2), 1);
+                CongWind = treshold;
                 fast_recovery = true;
                 fr_iterations = FR_MAX_ITERS;
             end
             
             %--------------------------------------------------------------
-            % Aggiorna le etichette 
+            % Aggiornamento etichette 
             %--------------------------------------------------------------
             if fast_recovery
                 techniqueStr = 'Fast Recovery';
-            elseif CongWind < threshold
+            elseif CongWind < treshold
                 techniqueStr = 'Slow Start';
             else
                 techniqueStr = 'Congestion Avoidance';
             end
             set(technique_label, 'String', ['Tecnica attuale: ' techniqueStr]);
-            set(cwnd_label, 'String', ['CWND: ' num2str(CongWind) '   Threshold: ' num2str(threshold)]);
+            set(cwnd_label, 'String', ['CWND: ' num2str(CongWind) '   Threshold: ' num2str(treshold)]);
             
             bufferOccupancy = min(CongWind, bufferCapacity);
             set(buffer_label, 'String', ['Buffer: ' num2str(bufferOccupancy) ' / ' num2str(bufferCapacity)]);
             
             %--------------------------------------------------------------
-            % Aggiorna il grafico
+            % Aggiornamento grafico
             %--------------------------------------------------------------
             plot(mainAx, [old_time, old_time+1], [old_CongWind, CongWind], 'Color','r','LineWidth',2);
             
